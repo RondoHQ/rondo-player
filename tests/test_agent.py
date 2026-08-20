@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import unittest
 from datetime import datetime
+from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
 from rondo_player.agent import is_active_period
+from rondo_player.hardware import chromium_executable
 from rondo_player.setup_screen import SetupScreen
 
 
@@ -29,6 +31,19 @@ class SetupScreenTest(unittest.TestCase):
         self.assertNotIn("<script>", rendered)
         self.assertIn("&lt;script&gt;", rendered)
         self.assertIn("&lt;b&gt;unsafe&lt;/b&gt;", rendered)
+
+
+class BrowserTest(unittest.TestCase):
+    @patch("rondo_player.hardware.os.access", return_value=True)
+    @patch("rondo_player.hardware.Path.is_file", return_value=True)
+    def test_prefers_direct_debian_binary(self, _is_file, _access) -> None:
+        self.assertEqual("/usr/lib/chromium/chromium", chromium_executable())
+
+    @patch("rondo_player.hardware.shutil.which")
+    @patch("rondo_player.hardware.Path.is_file", return_value=False)
+    def test_falls_back_to_path(self, _is_file, which) -> None:
+        which.side_effect = lambda name: "/usr/bin/chromium" if name == "chromium" else None
+        self.assertEqual("/usr/bin/chromium", chromium_executable())
 
 
 if __name__ == "__main__":

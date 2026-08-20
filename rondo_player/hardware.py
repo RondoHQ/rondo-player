@@ -3,11 +3,21 @@
 from __future__ import annotations
 
 import logging
+import os
 import shutil
 import subprocess
+from pathlib import Path
 from urllib.parse import urlencode
 
 LOGGER = logging.getLogger(__name__)
+
+
+def chromium_executable() -> str | None:
+    """Find Chromium without Raspberry Pi OS' incompatible launcher flags."""
+    direct_binary = Path("/usr/lib/chromium/chromium")
+    if direct_binary.is_file() and os.access(direct_binary, os.X_OK):
+        return str(direct_binary)
+    return shutil.which("chromium") or shutil.which("chromium-browser")
 
 
 class Browser:
@@ -25,7 +35,7 @@ class Browser:
         if self.running and self.url == url:
             return
         self.stop()
-        executable = shutil.which("chromium") or shutil.which("chromium-browser")
+        executable = chromium_executable()
         if not executable:
             raise RuntimeError("Chromium is niet geïnstalleerd")
         self.url = url
@@ -37,6 +47,8 @@ class Browser:
                 "--noerrdialogs",
                 "--disable-infobars",
                 "--disable-session-crashed-bubble",
+                "--password-store=basic",
+                "--use-angle=gles",
                 "--autoplay-policy=no-user-gesture-required",
                 url,
             ],
