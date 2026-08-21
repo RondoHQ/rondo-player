@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.1] - 2026-08-21
+
+### Fixed
+
+- Use the active desktop session's verified power policy for remote shutdown, so updating an existing player does not require a new sudoers rule.
+
+## [0.2.0] - 2026-08-21
+
+### Added
+
+- Allow administrators to shut down the Raspberry Pi through the predefined remote command channel.
+
 ## [0.1.2] - 2026-08-21
 
 ### Fixed

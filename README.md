@@ -31,8 +31,9 @@ chmod +x install.sh
 ```
 
 The installer adds `cec-utils`, installs the agent for the current desktop user,
-grants only the fixed reboot and shutdown commands through `sudo`, and enables
-its systemd user service. The TV then shows an activation code. In
+grants only the fixed reboot command through `sudo`, and enables its systemd
+user service. Shutdown uses the active desktop session's system power policy.
+The TV then shows an activation code. In
 Rondo, open **Club TV**, enter the code, name the screen and choose its
 wake/sleep times.
 

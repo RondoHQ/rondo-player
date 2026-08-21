@@ -127,7 +127,7 @@ class CommandReplayTest(unittest.TestCase):
         Agent._shutdown()
 
         run.assert_called_once_with(
-            ["sudo", "/usr/bin/systemctl", "poweroff"], check=True, timeout=10
+            ["/usr/bin/systemctl", "poweroff"], check=True, timeout=10
         )
 
     @patch.object(Agent, "_device_id", return_value="test-device")

@@ -207,7 +207,7 @@ class Agent:
 
     @staticmethod
     def _shutdown() -> None:
-        subprocess.run(["sudo", "/usr/bin/systemctl", "poweroff"], check=True, timeout=10)
+        subprocess.run(["/usr/bin/systemctl", "poweroff"], check=True, timeout=10)
 
     @staticmethod
     def _parse_server_time(value: str) -> float:
