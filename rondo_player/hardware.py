@@ -47,7 +47,10 @@ class Browser:
                 "--noerrdialogs",
                 "--disable-infobars",
                 "--disable-session-crashed-bubble",
+                f"--user-data-dir={Path.home() / '.config/rondo-player/chromium'}",
                 "--password-store=basic",
+                "--force-device-scale-factor=1",
+                "--disable-pinch",
                 "--use-angle=gles",
                 "--autoplay-policy=no-user-gesture-required",
                 url,
@@ -79,6 +82,35 @@ class Browser:
         self.process = None
 
 
+def connected_cec_adapter() -> str | None:
+    """Return the CEC adapter whose HDMI connector has a physical address."""
+    devices = sorted(Path("/dev").glob("cec[0-9]*"))
+    if not devices:
+        return None
+
+    cec_ctl = shutil.which("cec-ctl")
+    if cec_ctl:
+        for device in devices:
+            result = subprocess.run(
+                [cec_ctl, "-d", str(device), "--show-topology"],
+                text=True,
+                capture_output=True,
+                timeout=5,
+                check=False,
+            )
+            output = f"{result.stdout}\n{result.stderr}"
+            for line in output.splitlines():
+                if "Physical Address" not in line:
+                    continue
+                address = line.rsplit(":", 1)[-1].strip().lower()
+                if address and address != "f.f.f.f":
+                    return str(device)
+
+    # Older cec-utils versions may not expose connector topology. Preserve the
+    # previous single-port behaviour as a safe fallback.
+    return str(devices[0])
+
+
 class Cec:
     """Bounded HDMI-CEC commands; no remote shell surface."""
 
@@ -101,8 +133,12 @@ class Cec:
     def _send(self, commands: str, timeout: int = 12) -> None:
         if not self.executable:
             raise RuntimeError("cec-client is niet geïnstalleerd")
+        adapter = connected_cec_adapter()
+        arguments = [self.executable, "-s", "-d", "1"]
+        if adapter:
+            arguments.append(adapter)
         result = subprocess.run(
-            [self.executable, "-s", "-d", "1"],
+            arguments,
             input=commands,
             text=True,
             capture_output=True,
@@ -112,4 +148,4 @@ class Cec:
         if result.returncode != 0:
             detail = (result.stderr or result.stdout).strip()[-300:]
             raise RuntimeError(f"HDMI-CEC mislukt: {detail or result.returncode}")
-        LOGGER.info("HDMI-CEC command completed")
+        LOGGER.info("HDMI-CEC command completed via %s", adapter or "default adapter")

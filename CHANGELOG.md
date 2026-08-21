@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.2] - 2026-08-21
+
+### Fixed
+
+- Select the HDMI-CEC adapter whose HDMI port is actually connected on dual-port Raspberry Pis.
+- Prevent cached or replayed remote commands from executing more than once.
+- Keep Chromium in a dedicated profile and disable accidental pinch scaling.
+
 ## [0.1.1] - 2026-08-20
 
 ### Fixed

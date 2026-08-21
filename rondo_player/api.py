@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import ssl
+import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -48,7 +49,9 @@ class RondoApi:
         )
 
     def command(self, token: str) -> dict[str, Any] | None:
-        return self._request("GET", "/devices/me/commands", token=token).get("command")
+        cache_buster = time.time_ns()
+        path = f"/devices/me/commands?rondo_cache_buster={cache_buster}"
+        return self._request("GET", path, token=token).get("command")
 
     def acknowledge(self, token: str, command_id: str, status: str, error: str = "") -> dict[str, Any]:
         return self._request(
@@ -67,6 +70,9 @@ class RondoApi:
     ) -> dict[str, Any]:
         data = json.dumps(body).encode("utf-8") if body is not None else None
         headers = {"Accept": "application/json", "User-Agent": "RondoPlayer/0.1"}
+        if method == "GET":
+            headers["Cache-Control"] = "no-cache, no-store"
+            headers["Pragma"] = "no-cache"
         if body is not None:
             headers["Content-Type"] = "application/json"
         if token:

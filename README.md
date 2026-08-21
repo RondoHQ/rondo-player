@@ -43,6 +43,14 @@ journalctl --user -u rondo-player -f
 echo scan | cec-client -s -d 1
 ```
 
+On Raspberry Pis with two micro-HDMI ports, the player automatically selects
+the CEC adapter whose connector reports a physical HDMI address. To test a
+specific port manually, append its device, for example:
+
+```bash
+printf 'pow 0\n' | cec-client -s -d 1 /dev/cec1
+```
+
 HDMI-CEC must also be enabled in the television's settings. Manufacturers use
 names such as Anynet+, Bravia Sync, Simplink, VIERA Link and EasyLink.
 

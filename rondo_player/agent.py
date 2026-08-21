@@ -141,6 +141,16 @@ class Agent:
         self._apply_schedule()
 
     def _execute_command(self, command: dict[str, Any]) -> None:
+        command_id = str(command.get("id") or "")
+        if command_id and command_id == self.state.get("last_command_id"):
+            LOGGER.warning("Ignoring replayed command %s", command_id)
+            return
+        if command_id:
+            # Persist before executing. A reboot command can terminate the
+            # process before its acknowledgement reaches Rondo.
+            self.state["last_command_id"] = command_id
+            self._save_state()
+
         error = ""
         try:
             actions = {
