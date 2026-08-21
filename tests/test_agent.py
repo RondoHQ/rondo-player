@@ -122,6 +122,35 @@ class CommandReplayTest(unittest.TestCase):
                 "token", "command-1", "completed", ""
             )
 
+    @patch("rondo_player.agent.subprocess.run")
+    def test_shutdown_uses_bounded_systemctl_command(self, run) -> None:
+        Agent._shutdown()
+
+        run.assert_called_once_with(
+            ["sudo", "/usr/bin/systemctl", "poweroff"], check=True, timeout=10
+        )
+
+    @patch.object(Agent, "_device_id", return_value="test-device")
+    def test_shutdown_command_is_executed_and_acknowledged(self, _device_id) -> None:
+        with TemporaryDirectory() as directory:
+            agent = Agent(
+                "https://example.test",
+                Path(directory) / "state.json",
+                browser=Mock(),
+                cec=Mock(),
+                setup_screen=Mock(),
+            )
+            agent.state["token"] = "token"
+            agent.api = Mock()
+            agent._shutdown = Mock()
+
+            agent._execute_command({"id": "command-2", "name": "shutdown"})
+
+            agent._shutdown.assert_called_once_with()
+            agent.api.acknowledge.assert_called_once_with(
+                "token", "command-2", "completed", ""
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

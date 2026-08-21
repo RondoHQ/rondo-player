@@ -42,10 +42,15 @@ PY
 
 install -m 0644 "${SCRIPT_DIR}/systemd/rondo-player.service" "${SERVICE_DIR}/rondo-player.service"
 
-SUDOERS_FILE=/etc/sudoers.d/rondo-player-reboot
-echo "${USER} ALL=(root) NOPASSWD: /usr/bin/systemctl reboot" | sudo tee "${SUDOERS_FILE}" >/dev/null
+SUDOERS_FILE=/etc/sudoers.d/rondo-player-power
+echo "${USER} ALL=(root) NOPASSWD: /usr/bin/systemctl reboot, /usr/bin/systemctl poweroff" | sudo tee "${SUDOERS_FILE}" >/dev/null
 sudo chmod 0440 "${SUDOERS_FILE}"
 sudo visudo -cf "${SUDOERS_FILE}" >/dev/null
+
+LEGACY_SUDOERS_FILE=/etc/sudoers.d/rondo-player-reboot
+if [[ -f ${LEGACY_SUDOERS_FILE} ]]; then
+  sudo rm "${LEGACY_SUDOERS_FILE}"
+fi
 
 systemctl --user daemon-reload
 systemctl --user enable --now rondo-player.service

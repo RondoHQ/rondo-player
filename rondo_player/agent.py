@@ -160,6 +160,7 @@ class Agent:
                 "sleep_tv": self.cec.sleep,
                 "cec_detect": self.cec.detect,
                 "reboot": self._reboot,
+                "shutdown": self._shutdown,
             }
             action = actions.get(command.get("name"))
             if not action:
@@ -203,6 +204,10 @@ class Agent:
     @staticmethod
     def _reboot() -> None:
         subprocess.run(["sudo", "/usr/bin/systemctl", "reboot"], check=True, timeout=10)
+
+    @staticmethod
+    def _shutdown() -> None:
+        subprocess.run(["sudo", "/usr/bin/systemctl", "poweroff"], check=True, timeout=10)
 
     @staticmethod
     def _parse_server_time(value: str) -> float:

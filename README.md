@@ -12,7 +12,7 @@ uses HDMI-CEC to switch the connected television on and off.
 - full-screen Chromium display with cached offline content;
 - heartbeat and player-version reporting;
 - scheduled and manual HDMI-CEC wake/sleep;
-- predefined reload, browser restart, reboot and CEC-test commands;
+- predefined reload, browser restart, reboot, shutdown and CEC-test commands;
 - automatic restart through a user-level systemd service.
 
 The agent deliberately has no arbitrary remote-shell endpoint.
@@ -31,7 +31,8 @@ chmod +x install.sh
 ```
 
 The installer adds `cec-utils`, installs the agent for the current desktop user,
-and enables its systemd user service. The TV then shows an activation code. In
+grants only the fixed reboot and shutdown commands through `sudo`, and enables
+its systemd user service. The TV then shows an activation code. In
 Rondo, open **Club TV**, enter the code, name the screen and choose its
 wake/sleep times.
 
