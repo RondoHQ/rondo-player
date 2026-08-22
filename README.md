@@ -11,11 +11,30 @@ uses HDMI-CEC to switch the connected television on and off.
 - a device credential stored only on the Pi (Rondo stores its HMAC hash);
 - full-screen Chromium display with cached offline content;
 - heartbeat and player-version reporting;
+- signed automatic updates with stable/beta channels and rollback;
 - scheduled and manual HDMI-CEC wake/sleep;
 - predefined reload, browser restart, reboot, shutdown and CEC-test commands;
 - automatic restart through a user-level systemd service.
 
 The agent deliberately has no arbitrary remote-shell endpoint.
+
+## Automatic updates
+
+Rondo sends each player only its selected channel (`stable`, `beta` or `off`)
+and the administrator-approved target version. The download location is fixed
+in the player to this repository's GitHub releases; Rondo cannot supply an
+arbitrary package URL.
+
+Release tags build `rondo-player-X.Y.Z.tar.gz`, `manifest.json` and
+`manifest.sig`. The player verifies the Ed25519 signature and archive checksum,
+extracts into a versioned release directory and atomically switches the
+`current` symlink. A transient systemd guard waits two minutes for the new agent
+to mark itself healthy. If it cannot, the guard switches back to `previous` and
+restarts the service. Failed versions are retried at most once every six hours.
+
+The release workflow reads the private Ed25519 key from the repository secret
+`RELEASE_SIGNING_KEY`. Only the public key in
+`rondo_player/release-public.pem` is installed on players.
 
 ## Raspberry Pi installation
 
@@ -31,8 +50,9 @@ chmod +x install.sh
 ```
 
 The installer adds `cec-utils`, installs the agent for the current desktop user,
-grants only the fixed reboot command through `sudo`, and enables its systemd
-user service. Shutdown uses the active desktop session's system power policy.
+grants only the fixed reboot command through `sudo`, installs the code in a
+versioned release directory, and enables its systemd user service. Shutdown
+uses the active desktop session's system power policy.
 The TV then shows an activation code. In
 Rondo, open **Club TV**, enter the code, name the screen and choose its
 wake/sleep times.

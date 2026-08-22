@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0] - 2026-08-22
+
+### Added
+
+- Install signed GitHub releases automatically when Rondo approves a newer version for the player's stable or beta channel.
+- Activate releases through an atomic symlink and restore the previous release automatically when the new service does not report healthy within two minutes.
+
 ## [0.2.1] - 2026-08-21
 
 ### Fixed

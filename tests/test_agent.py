@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 import unittest
+import hashlib
+import io
+import json
+import tarfile
 from datetime import datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -11,6 +15,14 @@ from rondo_player.agent import Agent, is_active_period
 from rondo_player.api import RondoApi
 from rondo_player.hardware import Cec, chromium_executable, connected_cec_adapter
 from rondo_player.setup_screen import SetupScreen
+from rondo_player.updater import (
+    UpdateError,
+    _extract_archive,
+    apply_update,
+    should_retry,
+    target_version,
+    verify_health,
+)
 
 
 class ScheduleTest(unittest.TestCase):
@@ -150,6 +162,105 @@ class CommandReplayTest(unittest.TestCase):
             agent.api.acknowledge.assert_called_once_with(
                 "token", "command-2", "completed", ""
             )
+
+
+class UpdaterTest(unittest.TestCase):
+    def test_only_approved_newer_versions_are_selected(self) -> None:
+        self.assertEqual(
+            "0.3.0",
+            target_version({"channel": "stable", "target_version": "0.3.0"}, "0.2.1"),
+        )
+        self.assertIsNone(target_version({"channel": "off", "target_version": "9.0.0"}, "0.2.1"))
+        self.assertIsNone(target_version({"channel": "stable", "target_version": "0.2.1"}, "0.2.1"))
+        with self.assertRaises(UpdateError):
+            target_version({"channel": "stable", "target_version": "latest"}, "0.2.1")
+
+    def test_failed_release_is_throttled_for_six_hours(self) -> None:
+        attempt = {"target_version": "0.3.0", "attempted_at": 1_000}
+        self.assertFalse(should_retry(attempt, "0.3.0", now=1_001))
+        self.assertTrue(should_retry(attempt, "0.3.0", now=1_000 + 6 * 60 * 60))
+        self.assertTrue(should_retry(attempt, "0.3.1", now=1_001))
+
+    def test_archive_rejects_path_traversal(self) -> None:
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            archive = root / "release.tar.gz"
+            with tarfile.open(archive, "w:gz") as bundle:
+                payload = b"unsafe"
+                info = tarfile.TarInfo("../escape")
+                info.size = len(payload)
+                bundle.addfile(info, io.BytesIO(payload))
+            with self.assertRaises(UpdateError):
+                _extract_archive(archive, root / "output")
+
+    @patch("rondo_player.updater._restart_player")
+    @patch("rondo_player.updater._schedule_guard")
+    @patch("rondo_player.updater._verify_signature")
+    @patch("rondo_player.updater._download")
+    def test_signed_release_is_activated_atomically(self, download, _verify, guard, restart) -> None:
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            old_release = root / "releases/0.2.1"
+            old_release.mkdir(parents=True)
+            (root / "current").symlink_to(old_release)
+            archive = self._release_archive("0.3.0")
+            manifest = json.dumps(
+                {
+                    "version": "0.3.0",
+                    "artifact": "rondo-player-0.3.0.tar.gz",
+                    "sha256": hashlib.sha256(archive).hexdigest(),
+                }
+            ).encode()
+            download.side_effect = [manifest, b"signature", archive]
+
+            apply_update("0.3.0", root, root / "state.json")
+
+            self.assertEqual((root / "releases/0.3.0").resolve(), (root / "current").resolve())
+            self.assertEqual(old_release.resolve(), (root / "previous").resolve())
+            guard.assert_called_once()
+            restart.assert_called_once_with()
+
+    @patch("rondo_player.updater._restart_player")
+    def test_unhealthy_release_rolls_back(self, restart) -> None:
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            old_release = root / "releases/0.2.1"
+            new_release = root / "releases/0.3.0"
+            old_release.mkdir(parents=True)
+            new_release.mkdir(parents=True)
+            (root / "current").symlink_to(new_release)
+            (root / "update-status.json").write_text(
+                json.dumps(
+                    {
+                        "status": "pending",
+                        "target_version": "0.3.0",
+                        "previous_release": str(old_release),
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            verify_health("0.3.0", root, root / "state.json")
+
+            self.assertEqual(old_release.resolve(), (root / "current").resolve())
+            self.assertEqual("rolled_back", json.loads((root / "update-status.json").read_text())["status"])
+            restart.assert_called_once_with()
+
+    @staticmethod
+    def _release_archive(version: str) -> bytes:
+        output = io.BytesIO()
+        files = {
+            "rondo_player/__init__.py": f'__version__ = "{version}"\n'.encode(),
+            "rondo_player/__main__.py": b"pass\n",
+            "rondo_player/updater.py": b"pass\n",
+            "rondo_player/release-public.pem": b"public key\n",
+        }
+        with tarfile.open(fileobj=output, mode="w:gz") as bundle:
+            for name, payload in files.items():
+                info = tarfile.TarInfo(name)
+                info.size = len(payload)
+                bundle.addfile(info, io.BytesIO(payload))
+        return output.getvalue()
 
 
 if __name__ == "__main__":

@@ -1,0 +1,37 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate tag and test
+        run: |
+          version=$(python3 -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')
+          test "v${version}" = "${GITHUB_REF_NAME}"
+          python3 -m unittest discover -s tests -v
+
+      - name: Build signed release
+        env:
+          RELEASE_SIGNING_KEY: ${{ secrets.RELEASE_SIGNING_KEY }}
+        run: |
+          test -n "${RELEASE_SIGNING_KEY}"
+          python3 scripts/build_release.py
+          install -m 0600 /dev/null /tmp/rondo-player-release-key.pem
+          printf '%s\n' "${RELEASE_SIGNING_KEY}" > /tmp/rondo-player-release-key.pem
+          openssl pkeyutl -sign -inkey /tmp/rondo-player-release-key.pem -rawin -in dist/manifest.json -out dist/manifest.sig
+          rm /tmp/rondo-player-release-key.pem
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${GITHUB_REF_NAME}" dist/* --generate-notes --title "Rondo Player ${GITHUB_REF_NAME}"

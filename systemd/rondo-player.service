@@ -8,7 +8,7 @@ PartOf=graphical-session.target
 Type=simple
 Environment=DISPLAY=:0
 Environment=PYTHONUNBUFFERED=1
-WorkingDirectory=%h/.local/share/rondo-player/app
+WorkingDirectory=%h/.local/share/rondo-player/current
 ExecStart=/usr/bin/python3 -m rondo_player
 Restart=always
 RestartSec=5

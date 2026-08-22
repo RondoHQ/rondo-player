@@ -17,6 +17,7 @@ from rondo_player import __version__
 from rondo_player.api import ApiError, RondoApi
 from rondo_player.hardware import Browser, Cec
 from rondo_player.setup_screen import SetupScreen
+from rondo_player.updater import launch_update, mark_healthy, should_retry, target_version
 
 LOGGER = logging.getLogger(__name__)
 
@@ -51,7 +52,7 @@ class Agent:
         self.cec = cec or Cec()
         self.setup_screen = setup_screen or SetupScreen()
         self.config: dict[str, Any] = self.state.get("config") or {}
-        self.last_error = ""
+        self.last_error = str(self.state.get("update_error", ""))[:300]
         self._last_config_at = 0.0
         self._last_heartbeat_at = 0.0
         self._last_command_at = 0.0
@@ -72,6 +73,7 @@ class Agent:
                     self._pair()
                 else:
                     self._tick()
+                    mark_healthy(__version__)
             except KeyboardInterrupt:
                 self.browser.stop()
                 return
@@ -122,10 +124,13 @@ class Agent:
                 self.state["config"] = self.config
                 self._save_state()
                 self._last_config_at = now
-                self.last_error = ""
+                self._maybe_update()
             if now - self._last_heartbeat_at >= 60:
                 self.api.heartbeat(token, "playing", __version__, self.last_error)
                 self._last_heartbeat_at = now
+                if self.state.pop("update_error", None) is not None:
+                    self._save_state()
+                self.last_error = ""
             if now - self._last_command_at >= 15:
                 command = self.api.command(token)
                 self._last_command_at = now
@@ -139,6 +144,18 @@ class Agent:
             LOGGER.warning("Rondo API unavailable: %s", error)
 
         self._apply_schedule()
+
+    def _maybe_update(self) -> None:
+        """Launch one approved release update outside the player service."""
+        target = target_version(self.config.get("update"), __version__)
+        if not target or not should_retry(self.state.get("update_attempt"), target):
+            return
+        self.state["update_attempt"] = {
+            "target_version": target,
+            "attempted_at": int(time.time()),
+        }
+        self._save_state()
+        launch_update(target, self.state_path)
 
     def _execute_command(self, command: dict[str, Any]) -> None:
         command_id = str(command.get("id") or "")

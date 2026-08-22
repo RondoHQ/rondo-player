@@ -16,6 +16,18 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 INSTALL_DIR="${HOME}/.local/share/rondo-player"
 CONFIG_DIR="${HOME}/.config/rondo-player"
 SERVICE_DIR="${HOME}/.config/systemd/user"
+VERSION=$(python3 - "${SCRIPT_DIR}/rondo_player/__init__.py" <<'PY'
+import re
+import sys
+
+contents = open(sys.argv[1], encoding="utf-8").read()
+match = re.search(r'^__version__ = "([0-9]+\.[0-9]+\.[0-9]+)"$', contents, re.MULTILINE)
+if not match:
+    raise SystemExit("Player-versie ontbreekt")
+print(match.group(1))
+PY
+)
+RELEASE_DIR="${INSTALL_DIR}/releases/${VERSION}"
 
 sudo apt-get update
 sudo apt-get install -y cec-utils
@@ -25,8 +37,12 @@ if ! command -v chromium >/dev/null 2>&1 && ! command -v chromium-browser >/dev/
   exit 1
 fi
 
-mkdir -p "${INSTALL_DIR}/app" "${CONFIG_DIR}" "${SERVICE_DIR}"
-cp -R "${SCRIPT_DIR}/rondo_player" "${INSTALL_DIR}/app/"
+mkdir -p "${INSTALL_DIR}/releases" "${CONFIG_DIR}" "${SERVICE_DIR}"
+rm -rf "${RELEASE_DIR}"
+mkdir -p "${RELEASE_DIR}"
+cp -R "${SCRIPT_DIR}/rondo_player" "${RELEASE_DIR}/"
+ln -sfn "${RELEASE_DIR}" "${INSTALL_DIR}/current.new"
+mv -Tf "${INSTALL_DIR}/current.new" "${INSTALL_DIR}/current"
 
 python3 - "${CONFIG_DIR}/config.json" "${SITE_URL%/}" <<'PY'
 import json
